@@ -52,7 +52,7 @@ team-divider-aws/
 │ └── architecture.png
 │
 ├── database/
-│ └── table-screenshots.png (or .json schema)
+│ └── table-screenshots.png
 │
 └── README.md
 
