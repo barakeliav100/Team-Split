@@ -78,16 +78,6 @@ team-divider-aws/
 
 ---
 
-## 📸 Screenshots
-
-You can find screenshots of the AWS configuration, S3 bucket, Lambda functions, API routes, and DynamoDB tables inside the `diagrams/` and `database/` folders.
-
----
-
-## 📎 Notes
-
-This project was built and deployed as part of the final assignment in an academic cloud computing course.  
-Special thanks to OpenAI API and AWS Free Tier.
 
 
 
