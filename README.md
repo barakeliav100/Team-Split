@@ -75,11 +75,6 @@ team-divider-aws/
 - IAM roles restrict Lambda access to specific services (S3, DynamoDB)
 - API Gateway is protected with token-based access from frontend
 
----
-
-## 👥 Project Team
-
-- **Barak Eliav** – Project Leader & Fullstack Developer
 
 ---
 
