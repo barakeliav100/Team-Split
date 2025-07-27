@@ -1,0 +1,64 @@
+import json
+import boto3
+import os
+
+# יצירת חיבור ל-DynamoDB
+dynamodb = boto3.resource('dynamodb')
+table = dynamodb.Table('games')  # אם אתה רוצה להשתמש ב־ENV, שנה ל: os.environ['DYNAMODB_TABLE']
+
+def lambda_handler(event, context):
+    print("🚀 התחלת הרצת Lambda")
+
+    # בדיקת קיום גוף הבקשה
+    if 'body' not in event or event['body'] is None:
+        print("❌ חסר גוף הבקשה (body)")
+        return error_response(400, 'Missing request body')
+
+    try:
+        body = json.loads(event['body'])
+        print("✅ JSON פוענח:", body)
+
+        game_id = body.get('game_id')
+        players_count = body.get('players_count')
+
+        if not game_id or players_count is None:
+            print("❌ חסרים פרמטרים חובה: game_id או players_count")
+            return error_response(400, 'Missing game_id or players_count')
+
+        # המרה למספר שלם
+        players_count = int(players_count)
+        print(f"✅ עדכון המשחק {game_id} עם players_count = {players_count}")
+
+        # עדכון בטבלה
+        response = table.update_item(
+            Key={'game_id': game_id},
+            UpdateExpression='SET players_count = :pc',
+            ExpressionAttributeValues={':pc': players_count}
+        )
+
+        print("✅ עדכון בוצע בהצלחה:", response)
+
+        return {
+            'statusCode': 200,
+            'body': json.dumps({'message': 'players_count updated successfully'}),
+            'headers': cors_headers()
+        }
+
+    except Exception as e:
+        print("❌ שגיאה כללית:", str(e))
+        return error_response(500, 'Internal Server Error')
+
+
+def cors_headers():
+    return {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': '*',
+        'Access-Control-Allow-Methods': 'OPTIONS,POST'
+    }
+
+def error_response(status_code, message):
+    return {
+        'statusCode': status_code,
+        'body': json.dumps({'error': message}),
+        'headers': cors_headers()
+    }
