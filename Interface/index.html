@@ -1,1 +1,320 @@
+index.html:
+<!DOCTYPE html>
+<html lang="he">
+<head>
+  <meta charset="UTF-8" />
+  <title>יצירת משחק חדש</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.jsdelivr.net/npm/amazon-cognito-identity-js/dist/amazon-cognito-identity.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      direction: rtl;
+      background-color: #f7f9fb;
+      margin: 0;
+      padding: 20px;
+    }
 
+    #userBar {
+      background-color: #28a745;
+      color: white;
+      padding: 10px 20px;
+      font-weight: bold;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .form-section {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+      max-width: 600px;
+      margin: 20px auto;
+      padding: 20px;
+    }
+
+    label, input, select {
+      display: block;
+      width: 100%;
+      margin-bottom: 10px;
+      font-size: 1rem;
+    }
+
+    .button-row {
+      display: flex;
+      justify-content: center;
+      margin-top: 10px;
+      gap: 10px;
+    }
+
+    button {
+      padding: 10px 20px;
+      background-color: #28a745;
+      color: white;
+      font-size: 1rem;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #218838;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: center;
+    }
+
+    td input, td select {
+      width: 90%;
+      padding: 5px;
+      font-size: 1rem;
+    }
+
+    #statusMessage {
+      margin-top: 20px;
+      font-weight: bold;
+      color: #155724;
+      white-space: pre-line;
+      text-align: center;
+    }
+
+    /* ✅ עיצוב לטבלת התוצאות הסופית */
+    #finalResults {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+      max-width: 800px;
+      margin: 20px auto;
+      padding: 20px;
+    }
+
+    .results-title {
+      text-align: center;
+      font-size: 2rem;
+      color: #28a745;
+      margin-bottom: 20px;
+    }
+
+    .summary-stats {
+      display: flex;
+      justify-content: space-around;
+      background-color: #f8f9fa;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+
+    .stat-item {
+      text-align: center;
+    }
+
+    .stat-number {
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: #28a745;
+    }
+
+    .stat-label {
+      font-size: 0.9rem;
+      color: #6c757d;
+    }
+
+    #teamsTable {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+
+    #teamsTable th {
+      background-color: #28a745;
+      color: white;
+      padding: 12px;
+      text-align: center;
+      font-weight: bold;
+    }
+
+    #teamsTable td {
+      padding: 10px;
+      border: 1px solid #dee2e6;
+      text-align: center;
+    }
+
+    #teamsTable tbody tr:nth-child(even) {
+      background-color: #f8f9fa;
+    }
+
+    #teamsTable tbody tr:hover {
+      background-color: #e9ecef;
+    }
+
+    .team-badge {
+      background-color: #28a745;
+      color: white;
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      font-weight: bold;
+    }
+
+    .position-badge {
+      background-color: #17a2b8;
+      color: white;
+      padding: 2px 6px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+    }
+
+    .rating-badge {
+      background-color: #ffc107;
+      color: #212529;
+      padding: 2px 6px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: bold;
+    }
+
+    .new-game-button {
+      background-color: #007bff;
+      margin-top: 20px;
+    }
+
+    .new-game-button:hover {
+      background-color: #0056b3;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="userBar">
+    <span id="userEmail">...</span>
+    <button onclick="logout()">התנתק</button>
+  </div>
+
+  <!-- ✅ אזור הטפסים - יוסתר אחרי החלוקה -->
+  <div id="formsContainer">
+    <div class="form-section">
+
+      <form id="gameForm">
+        <label for="datetime">תאריך ושעה למשחק:</label>
+        <input type="datetime-local" id="datetime" required />
+        <div class="button-row">
+          <button type="submit">צור משחק</button>
+        </div>
+      </form>
+
+      <form id="playersCountForm" style="display: none;">
+        <label for="playersCount">כמה שחקנים ישחקו?</label>
+        <input type="number" id="playersCount" min="4" max="33" required />
+        <div class="button-row">
+          <button type="submit">שמור מספר שחקנים</button>
+        </div>
+      </form>
+
+      <form id="teamsForm" style="display: none;">
+        <label for="teamsCount">בחר מספר קבוצות:</label>
+        <select id="teamsCount" required></select>
+        <div class="button-row">
+          <button type="submit">שמור מספר קבוצות</button>
+        </div>
+      </form>
+
+      <form id="playersForm" style="display: none;">
+        <label for="playerName">שם שחקן:</label>
+        <input type="text" id="playerName" />
+
+        <label for="playerPosition">עמדה:</label>
+        <select id="playerPosition">
+          <option>שוער</option>
+          <option>בלם</option>
+          <option>מגן</option>
+          <option>קשר</option>
+          <option>חלוץ</option>
+        </select>
+
+        <label for="playerRating">ציון:</label>
+        <select id="playerRating"></select>
+
+        <div class="button-row">
+          <button type="button" onclick="addPlayer()">הוסף שחקן</button>
+        </div>
+      </form>
+
+      <table id="playersTable" style="display: none;">
+        <thead>
+          <tr>
+            <th>שם</th>
+            <th>עמדה</th>
+            <th>ציון</th>
+            <th>פעולות</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+
+      <!-- כפתור שמירת שחקנים -->
+      <div class="button-row">
+        <button id="continueButton" style="display: none;" onclick="finalizePlayers()">שמור</button>
+      </div>
+      
+      <!-- כפתור חלוקה לקבוצות -->
+      <div class="button-row">
+        <button id="divideTeamsButton" style="display: none;" onclick="divideTeams()">חלק לקבוצות</button>
+      </div>
+
+      <div id="statusMessage"></div>
+
+    </div>
+  </div>
+
+  <!-- ✅ אזור התוצאות הסופיות - יוצג אחרי החלוקה -->
+  <div id="finalResults" style="display: none;">
+    <h2 class="results-title">🏆 תוצאות חלוקת הקבוצות</h2>
+    
+    <div class="summary-stats">
+      <div class="stat-item">
+        <div class="stat-number" id="totalTeamsCount">0</div>
+        <div class="stat-label">קבוצות</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-number" id="totalPlayersCount">0</div>
+        <div class="stat-label">שחקנים</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-number" id="avgRating">0</div>
+        <div class="stat-label">ממוצע כללי</div>
+      </div>
+    </div>
+
+    <table id="teamsTable">
+      <thead>
+        <tr>
+          <th>קבוצה</th>
+          <th>שם שחקן</th>
+          <th>עמדה</th>
+          <th>ציון</th>
+        </tr>
+      </thead>
+      <tbody id="teamsTableBody">
+        <!-- השחקנים יוצגו כאן -->
+      </tbody>
+    </table>
+
+    <div class="button-row">
+      <button class="new-game-button" onclick="startNewGame()">משחק חדש</button>
+    </div>
+  </div>
+
+  <!-- ✅ קישור לקובץ JavaScript נפרד -->
+  <script src="app.js"></script>
+</body>
+</html>
