@@ -1,0 +1,72 @@
+import json
+import boto3
+import os
+
+dynamodb = boto3.resource('dynamodb')
+table = dynamodb.Table('games')  # ודא שזה שם הטבלה שלך
+
+def lambda_handler(event, context):
+    print("🚀 התחלת הרצת Lambda")
+
+    try:
+        if 'body' not in event or event['body'] is None:
+            print("❌ לא התקבל גוף בבקשה")
+            return {
+                'statusCode': 400,
+                'body': json.dumps({'error': 'Missing request body'}),
+                'headers': {
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Headers': '*',
+                    'Access-Control-Allow-Methods': 'OPTIONS,POST'
+                }
+            }
+
+        data = json.loads(event['body'])
+        print("✅ JSON פוענח:", data)
+
+        game_id = data.get('game_id')
+        teams_count = data.get('teams_count')
+
+        if not game_id or teams_count is None:
+            print("❌ חסר game_id או teams_count")
+            return {
+                'statusCode': 400,
+                'body': json.dumps({'error': 'Missing game_id or teams_count'}),
+                'headers': {
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Headers': '*',
+                    'Access-Control-Allow-Methods': 'OPTIONS,POST'
+                }
+            }
+
+        teams_count = int(teams_count)
+        print(f"✅ עדכון game_id={game_id} עם teams_count={teams_count}")
+
+        response = table.update_item(
+            Key={'game_id': game_id},
+            UpdateExpression='SET teams_count = :tc',
+            ExpressionAttributeValues={':tc': teams_count}
+        )
+        print("✅ עדכון הצליח:", response)
+
+        return {
+            'statusCode': 200,
+            'body': json.dumps({'message': 'teams_count updated successfully'}),
+            'headers': {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Headers': '*',
+                'Access-Control-Allow-Methods': 'OPTIONS,POST'
+            }
+        }
+
+    except Exception as e:
+        print("❌ שגיאה:", str(e))
+        return {
+            'statusCode': 500,
+            'body': json.dumps({'error': 'Internal Server Error'}),
+            'headers': {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Headers': '*',
+                'Access-Control-Allow-Methods': 'OPTIONS,POST'
+            }
+        }
