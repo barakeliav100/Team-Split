@@ -33,30 +33,32 @@ The system is built entirely on AWS:
 ---
 
 ## 📂 Project Structure
+
+```
 team-divider-aws/
 ├── interface/
-│ ├── index.html
-│ ├── login.html
-│ └── app.js
+│   ├── index.html
+│   ├── login.html
+│   └── app.js
 │
 ├── lambdas/
-│ ├── set-game.py
-│ ├── set-players.py
-│ ├── set-playerscount.py
-│ ├── set-teamscount.py
-│ ├── set-teamdevider.py
-│ ├── get-teams.py
-│ └── analyzeImage.py
+│   ├── set-game.py
+│   ├── set-players.py
+│   ├── set-playerscount.py
+│   ├── set-teamscount.py
+│   ├── set-teamdevider.py
+│   ├── get-teams.py
+│   └── analyzeImage.py
 │
 ├── diagrams/
-│ └── architecture.png
+│   └── architecture.png
 │
 ├── database/
-│ └── table-screenshots.png
+│   └── table-screenshots.png
 │
 └── README.md
+```
 
----
 
 ## 🚀 Deployment Info
 
