@@ -33,5 +33,65 @@ The system is built entirely on AWS:
 ---
 
 ## 📂 Project Structure
+team-divider-aws/
+├── interface/
+│ ├── index.html
+│ ├── login.html
+│ └── app.js
+│
+├── lambdas/
+│ ├── set-game.py
+│ ├── set-players.py
+│ ├── set-playerscount.py
+│ ├── set-teamscount.py
+│ ├── set-teamdevider.py
+│ ├── get-teams.py
+│ └── analyzeImage.py
+│
+├── diagrams/
+│ └── architecture.png
+│
+├── database/
+│ └── table-screenshots.png (or .json schema)
+│
+└── README.md
+
+---
+
+## 🚀 Deployment Info
+
+- Frontend hosted on **Amazon S3** (public bucket)
+- Backend APIs deployed via **API Gateway**
+- Logic processed in **Lambda** functions (Python 3.13)
+- OpenAI used via API call from `set-teamdevider.py`
+
+---
+
+## 🔐 Security
+
+- Cognito authentication used for user login (login.html)
+- IAM roles restrict Lambda access to specific services (S3, DynamoDB)
+- API Gateway is protected with token-based access from frontend
+
+---
+
+## 👥 Project Team
+
+- **Barak Eliav** – Project Leader & Fullstack Developer
+
+---
+
+## 📸 Screenshots
+
+You can find screenshots of the AWS configuration, S3 bucket, Lambda functions, API routes, and DynamoDB tables inside the `diagrams/` and `database/` folders.
+
+---
+
+## 📎 Notes
+
+This project was built and deployed as part of the final assignment in an academic cloud computing course.  
+Special thanks to OpenAI API and AWS Free Tier.
+
+
 
 
