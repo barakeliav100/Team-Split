@@ -1,0 +1,153 @@
+import json
+import boto3
+from decimal import Decimal
+
+dynamodb = boto3.resource('dynamodb')
+players_table = dynamodb.Table('players_new')
+teams_table = dynamodb.Table('teams')
+
+def decimal_default(obj):
+    if isinstance(obj, Decimal):
+        return float(obj)
+    raise TypeError
+
+def lambda_handler(event, context):
+    try:
+        print(f"Event received: {json.dumps(event)}")
+        
+        # קבלת game_id מה-query parameters או מה-body
+        game_id = None
+        
+        # בדיקה אם זה GET request עם query parameters
+        if event.get('queryStringParameters') and event['queryStringParameters']:
+            game_id = event['queryStringParameters'].get('game_id')
+        
+        # בדיקה אם זה POST request עם body
+        elif event.get('body'):
+            try:
+                body = json.loads(event['body'])
+                game_id = body.get('game_id')
+            except json.JSONDecodeError:
+                return {
+                    'statusCode': 400, 
+                    'body': json.dumps({'error': 'Invalid JSON in request body'}),
+                    'headers': {
+                        'Access-Control-Allow-Origin': '*',
+                        'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+                        'Access-Control-Allow-Methods': 'POST,OPTIONS'
+                    }
+                }
+        
+        # אם אין game_id, נסה לחלץ מה-path parameters
+        elif event.get('pathParameters') and event['pathParameters']:
+            game_id = event['pathParameters'].get('game_id')
+        
+        if not game_id:
+            return {
+                'statusCode': 400, 
+                'body': json.dumps({'error': 'Missing game_id parameter'}),
+                'headers': {
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+                    'Access-Control-Allow-Methods': 'POST,OPTIONS'
+                }
+            }
+
+        print(f"Looking for teams with game_id: {game_id}")
+
+        # ✅ קבלת כל הקבוצות של המשחק
+        teams_resp = teams_table.scan(
+            FilterExpression=boto3.dynamodb.conditions.Attr('game_id').eq(game_id)
+        )
+        teams = teams_resp['Items']
+        
+        print(f"Found {len(teams)} teams")
+        
+        if not teams:
+            return {
+                'statusCode': 404, 
+                'body': json.dumps({'error': f'No teams found for game_id: {game_id}'}),
+                'headers': {
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+                    'Access-Control-Allow-Methods': 'POST,OPTIONS'
+                }
+            }
+
+        # ✅ מיון הקבוצות לפי מספר הקבוצה
+        teams.sort(key=lambda x: x.get('team_number', 0))
+        
+        teams_data = []
+        
+        # ✅ עבור כל קבוצה, קבלת השחקנים שלה
+        for team in teams:
+            team_id = team['team_id']
+            
+            print(f"Getting players for team {team_id}")
+            
+            # קבלת השחקנים של הקבוצה
+            players_resp = players_table.scan(
+                FilterExpression=boto3.dynamodb.conditions.Attr('game_id').eq(game_id) & 
+                               boto3.dynamodb.conditions.Attr('team_id').eq(team_id)
+            )
+            team_players = players_resp['Items']
+            
+            # מיון השחקנים לפי עמדה (שוערים קודם)
+            position_order = {'שוער': 1, 'בלם': 2, 'מגן': 3, 'קשר': 4, 'חלוץ': 5}
+            team_players.sort(key=lambda x: (
+                position_order.get(x.get('position', ''), 6),
+                -float(x.get('rating', 0))  # דירוג גבוה קודם
+            ))
+            
+            # הכנת נתוני הקבוצה
+            team_data = {
+                'team_id': team_id,
+                'team_number': int(team.get('team_number', 0)),
+                'average_rating': float(team.get('average_rating', 0)),
+                'players_count': len(team_players),
+                'players': []
+            }
+            
+            # הוספת השחקנים
+            for player in team_players:
+                team_data['players'].append({
+                    'name': str(player.get('name', '')),
+                    'position': str(player.get('position', '')),
+                    'rating': float(player.get('rating', 0))
+                })
+            
+            teams_data.append(team_data)
+        
+        # ✅ מיון סופי לפי מספר הקבוצה
+        teams_data.sort(key=lambda x: x['team_number'])
+        
+        print(f"Returning {len(teams_data)} teams with players")
+
+        return {
+            'statusCode': 200, 
+            'body': json.dumps({
+                'success': True,
+                'game_id': game_id,
+                'teams_count': len(teams_data),
+                'teams': teams_data
+            }, default=decimal_default),
+            'headers': {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+                'Access-Control-Allow-Methods': 'POST,OPTIONS'
+            }
+        }
+
+    except Exception as e:
+        print(f"Unexpected error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return {
+            'statusCode': 500, 
+            'body': json.dumps({'error': f'Internal server error: {str(e)}'}),
+            'headers': {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+                'Access-Control-Allow-Methods': 'GET,POST,OPTIONS'
+            }
+        }
