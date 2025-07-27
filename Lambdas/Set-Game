@@ -1,0 +1,53 @@
+import json
+import boto3
+import uuid
+
+dynamodb = boto3.resource('dynamodb')
+table = dynamodb.Table('games')  # ודא שזה באמת שם הטבלה שלך
+
+def lambda_handler(event, context):
+    try:
+        # ✅ שליפת אימייל מתוך הטוקן עבור HTTP API (שימו לב ל־jwt.claims)
+        user_email = event['requestContext']['authorizer']['jwt']['claims']['email']
+
+        # פיענוח גוף הבקשה
+        body = json.loads(event['body'])
+        datetime = body.get('datetime')
+        team_id = body.get('team_id')
+
+        # בדיקת קלט
+        if not datetime or not team_id:
+            return {
+                'statusCode': 400,
+                'body': json.dumps({'error': 'Missing datetime or team_id'})
+            }
+
+        # יצירת מזהה ייחודי למשחק
+        game_id = str(uuid.uuid4())
+
+        # הכנת הרשומה לכתיבה
+        item = {
+            'game_id': game_id,
+            'datetime': datetime,
+            'team_id': team_id,
+            'created_by': user_email
+        }
+
+        # כתיבה ל-DynamoDB
+        table.put_item(Item=item)
+
+        return {
+            'statusCode': 200,
+            'body': json.dumps({'message': 'Game created successfully', 'game_id': game_id})
+        }
+
+    except Exception as e:
+        return {
+            'statusCode': 500,
+            'body': json.dumps({'error': str(e)})
+        }
+
+
+
+
+set-game
