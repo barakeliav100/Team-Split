@@ -1,0 +1,62 @@
+import json
+import boto3
+import uuid
+from decimal import Decimal
+
+dynamodb = boto3.resource('dynamodb')
+table = dynamodb.Table('players_new')  # ודא שזה השם הנכון
+
+def lambda_handler(event, context):
+    try:
+        # שליפת אימייל מהטוקן (JWT Claims)
+        user_email = event['requestContext']['authorizer']['jwt']['claims']['email']
+
+        # פיענוח גוף הבקשה
+        body = json.loads(event['body'])
+        game_id = body.get('game_id')
+        players = body.get('players', [])
+
+        # בדיקות קלט
+        if not game_id or not isinstance(players, list):
+            return {
+                'statusCode': 400,
+                'body': json.dumps({'error': 'Missing game_id or players list'})
+            }
+
+        with table.batch_writer() as batch:
+            for p in players:
+                player_id = f"p-{str(uuid.uuid4())[:8]}"
+                name = p.get('name')
+                position = p.get('position')
+                rating_raw = p.get('rating')
+
+                # המרה ל-Decimal (DynamoDB לא תומך float רגיל)
+                try:
+                    rating = Decimal(str(rating_raw))
+                except:
+                    return {
+                        'statusCode': 400,
+                        'body': json.dumps({'error': f'Invalid rating for player: {name}'})
+                    }
+
+                item = {
+                    'player_id': player_id,
+                    'game_id': game_id,
+                    'name': name,
+                    'position': position,
+                    'rating': rating,
+                    'created_by': user_email  # אופציונלי, למעקב
+                }
+
+                batch.put_item(Item=item)
+
+        return {
+            'statusCode': 200,
+            'body': json.dumps({'message': 'All players saved successfully'})
+        }
+
+    except Exception as e:
+        return {
+            'statusCode': 500,
+            'body': json.dumps({'error': str(e)})
+        }
