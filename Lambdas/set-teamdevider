@@ -1,0 +1,194 @@
+import json
+import boto3
+import uuid
+from decimal import Decimal
+
+dynamodb = boto3.resource('dynamodb')
+players_table = dynamodb.Table('players_new')
+teams_table = dynamodb.Table('teams')
+games_table = dynamodb.Table('games')
+
+def decimal_default(obj):
+    if isinstance(obj, Decimal):
+        return float(obj)
+    raise TypeError
+
+def smart_team_division_balanced(players, teams_count):
+    """חלוקה חכמה ומאוזנת בלי AI"""
+    print(f"מתחיל חלוקה מאוזנת עבור {len(players)} שחקנים ל-{teams_count} קבוצות")
+    
+    # מיון השחקנים לפי דירוג (מהגבוה לנמוך)
+    sorted_players = sorted(players, key=lambda x: float(x.get('rating', 0)), reverse=True)
+    
+    # יצירת קבוצות ריקות
+    teams = [[] for _ in range(teams_count)]
+    team_ratings = [0.0] * teams_count
+    
+    # הפרדת שוערים
+    goalkeepers = [p for p in sorted_players if p.get('position') == 'שוער']
+    other_players = [p for p in sorted_players if p.get('position') != 'שוער']
+    
+    print(f"נמצאו {len(goalkeepers)} שוערים ו-{len(other_players)} שחקנים אחרים")
+    
+    # חלוקת שוערים - שוער אחד לכל קבוצה
+    for i, goalkeeper in enumerate(goalkeepers[:teams_count]):
+        teams[i].append(goalkeeper)
+        team_ratings[i] += float(goalkeeper.get('rating', 0))
+        print(f"שוער {goalkeeper.get('name')} הוקצה לקבוצה {i+1}")
+    
+    # חלוקת שאר השחקנים - תמיד לקבוצה עם הדירוג הנמוך ביותר
+    for player in other_players:
+        # מציאת הקבוצה עם הדירוג הנמוך ביותר
+        min_rating_team = team_ratings.index(min(team_ratings))
+        teams[min_rating_team].append(player)
+        team_ratings[min_rating_team] += float(player.get('rating', 0))
+        print(f"שחקן {player.get('name')} הוקצה לקבוצה {min_rating_team+1}")
+    
+    # יצירת מבנה התוצאה
+    result_teams = []
+    for i, team_players in enumerate(teams):
+        if team_players:  # רק אם יש שחקנים בקבוצה
+            avg_rating = team_ratings[i] / len(team_players) if team_players else 0
+            result_teams.append({
+                'team_number': i + 1,
+                'players': team_players
+            })
+            print(f"קבוצה {i+1}: {len(team_players)} שחקנים, ממוצע {avg_rating:.2f}")
+    
+    print(f"הוכנו {len(result_teams)} קבוצות מאוזנות")
+    return result_teams
+
+def lambda_handler(event, context):
+    try:
+        print(f"Event received: {json.dumps(event)}")
+        
+        body = json.loads(event['body'])
+        game_id = body.get('game_id')
+        
+        if not game_id:
+            return {
+                'statusCode': 400, 
+                'body': json.dumps({'error': 'Missing game_id'}),
+                'headers': {
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+                    'Access-Control-Allow-Methods': 'POST,OPTIONS'
+                }
+            }
+
+        print(f"Looking for players with game_id: {game_id}")
+
+        # ✅ קבלת השחקנים (בדיוק כמו בקוד המקורי)
+        players_resp = players_table.scan(
+            FilterExpression=boto3.dynamodb.conditions.Attr('game_id').eq(game_id)
+        )
+        players = players_resp['Items']
+        
+        print(f"Found {len(players)} players")
+        for player in players:
+            print(f"Player: {player}")
+        
+        if not players:
+            return {
+                'statusCode': 404, 
+                'body': json.dumps({'error': f'No players found for game_id: {game_id}'}),
+                'headers': {
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+                    'Access-Control-Allow-Methods': 'POST,OPTIONS'
+                }
+            }
+
+        # ✅ קבלת פרטי המשחק (בדיוק כמו בקוד המקורי)
+        game_resp = games_table.get_item(Key={'game_id': game_id})
+        game = game_resp.get('Item')
+        
+        print(f"Game details: {game}")
+        
+        if not game or 'teams_count' not in game:
+            return {
+                'statusCode': 400, 
+                'body': json.dumps({'error': 'Missing teams_count in game'}),
+                'headers': {
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+                    'Access-Control-Allow-Methods': 'POST,OPTIONS'
+                }
+            }
+
+        teams_count = int(game['teams_count'])
+        
+        # ✅ חלוקה חכמה ומאוזנת
+        teams = smart_team_division_balanced(players, teams_count)
+        
+        print(f"Created {len(teams)} teams")
+        
+        # ✅ יצירת הקבוצות ועדכון השחקנים (בדיוק כמו בקוד המקורי!)
+        for team in teams:
+            # יצירת team_id חדש
+            team_id = f"team{team['team_number']}_{str(uuid.uuid4())[:8]}"
+            
+            team_players = team['players']
+            if team_players:
+                avg_rating = sum(float(p.get('rating', 0)) for p in team_players) / len(team_players)
+            else:
+                avg_rating = 0
+            
+            # שמירת הקבוצה
+            teams_table.put_item(Item={
+                'team_id': team_id,
+                'game_id': game_id,
+                'average_rating': Decimal(str(round(avg_rating, 2))),
+                'team_number': team['team_number'],
+                'players_count': len(team_players)
+            })
+            
+            print(f"Created team {team_id} with {len(team_players)} players")
+            
+            # עדכון השחקנים עם ה-team_id
+            for player in team_players:
+                print(f"Trying to update player: {player}")
+                
+                # ✅ עדכון לפי player_id (בדיוק כמו בקוד המקורי)
+                try:
+                    if 'player_id' in player:
+                        players_table.update_item(
+                            Key={'player_id': player['player_id']},
+                            UpdateExpression='SET team_id = :tid',
+                            ExpressionAttributeValues={':tid': team_id}
+                        )
+                        print(f"✅ Updated player {player.get('name', 'unknown')} via player_id")
+                    else:
+                        print(f"❌ No player_id found for player: {player}")
+                        
+                except Exception as update_error:
+                    print(f"❌ Error updating player {player.get('name', 'unknown')}: {str(update_error)}")
+
+        # ✅ תגובה זהה לקוד המקורי
+        return {
+            'statusCode': 200, 
+            'body': json.dumps({
+                'message': 'Teams assigned successfully with smart balanced algorithm',
+                'teams_created': len(teams),
+                'total_players': len(players)
+            }),
+            'headers': {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+                'Access-Control-Allow-Methods': 'POST,OPTIONS'
+            }
+        }
+
+    except Exception as e:
+        print(f"Unexpected error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return {
+            'statusCode': 500, 
+            'body': json.dumps({'error': f'Internal server error: {str(e)}'}),
+            'headers': {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+                'Access-Control-Allow-Methods': 'POST,OPTIONS'
+            }
+        }
